@@ -106,6 +106,20 @@ Uninstall through the **Plugins UI** for a clean removal: the `gh` binary and th
 - The token is read from your A0 Secret at call time and passed only to the `gh`/`git` process that needs it; it is never written to a `gh` login file or git credential store, and never printed.
 - Requires outbound network access on first run to download `gh`.
 
+## Citing
+
+If you use this in your work, please cite it (use the **"Cite this repository"** button on GitHub, or):
+
+```bibtex
+@misc{a0githubplugin2026,
+  title        = {a0-github-plugin: skill-guided GitHub operations for Agent Zero},
+  author       = {King0James0},
+  year         = {2026},
+  howpublished = {\url{https://github.com/King0James0/a0-github-plugin}},
+  note         = {GitHub repository}
+}
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -1,0 +1,20 @@
+# GitHub plugin defaults. Override per-scope via the plugin config UI or env.
+#
+# transport: how the agent talks to GitHub.
+#   gh  - shell out to the gh CLI (default; the skills pack carries the command templates)
+#   mcp - register GitHub's MCP server into A0's MCP client (planned, not yet implemented)
+transport: gh
+
+# Name of the A0 Secret (Settings > External Services > Secrets) holding a GitHub token.
+# Auth is stateless: the token is read from this Secret at the moment each gh/git command
+# runs and is never written to a gh or git credential store. gh reads GITHUB_TOKEN natively.
+secret_key: GITHUB_TOKEN
+
+# gh CLI version to install. "latest" resolves the newest release at install time;
+# otherwise pin a tag like "v2.63.2".
+gh_version: latest
+
+# Reserved for the mcp transport (planned second build). Ignored while transport: gh.
+mcp:
+  mode: hosted                              # hosted | self_hosted
+  endpoint: https://api.githubcopilot.com/mcp/

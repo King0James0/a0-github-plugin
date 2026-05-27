@@ -1,7 +1,7 @@
 name: github
 title: GitHub
-description: Reliable, skill-guided GitHub operations for Agent Zero via the gh CLI. Bundles tested command-template skills for opening PRs, triaging issues, reviewing PRs, and searching. Authenticates from an A0 Secret.
-version: 1.0.0
+description: Reliable, skill-guided GitHub operations for Agent Zero via the gh CLI. Bundles tested command-template skills for opening PRs, triaging issues, reviewing PRs, searching, and cutting releases with notes. Authenticates from an A0 Secret.
+version: 1.1.0
 settings_sections: []
 per_project_config: false
 per_agent_config: false

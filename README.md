@@ -10,6 +10,7 @@ Once installed and given a token, the agent can:
 - **Triage issues** (`github-triage-issue`) — list, read, label, assign, comment on, create, and close issues.
 - **Review pull requests** (`github-review-pr`) — read a PR, inspect its diff, check CI status, and approve / comment / request changes.
 - **Search GitHub** (`github-search`) — find code, issues, PRs, or repositories, and call the GitHub REST/GraphQL API directly.
+- **Create releases** (`github-create-release`) — tag a version and publish a GitHub release with real, user-facing notes (matched to the project version); refuses to overwrite an existing release.
 
 Each ability ships as a focused skill containing the exact `gh` commands for that workflow, so the agent doesn't have to guess.
 
@@ -49,7 +50,7 @@ Either token type works. A **classic PAT** is the quickest to set up; a **fine-g
 
    | Permission | Level | Needed for |
    |---|---|---|
-   | Contents | Read and write | push/pull, branches (open PR) |
+   | Contents | Read and write | push/pull, branches (open PR), tags + releases (create release) |
    | Pull requests | Read and write | create and review PRs |
    | Issues | Read and write | triage issues |
    | Workflows | Read and write | PRs that touch `.github/workflows/` |

@@ -16,6 +16,7 @@ Once installed and given a token, the agent can:
 - **Triage issues** (`github-triage-issue`) — list, read, label, assign, comment on, create, and close issues.
 - **Review pull requests** (`github-review-pr`) — read a PR, inspect its diff, check CI status, and approve / comment / request changes.
 - **Search GitHub** (`github-search`) — find code, issues, PRs, or repositories, and call the GitHub REST/GraphQL API directly.
+- **Watch repos** (`github-watch`) — poll a set of repos for new/updated issues and PRs since the last check, and add/remove/show watched repos. The watched set is the union of the repo list you keep in the plugin's **Config** panel (`watch_repos`) and the repos you Watch on GitHub. Saying "watch owner/name" in chat updates that same config list. Scope is issues + PRs; only the per-repo last-checked timestamps live in a runtime file (`/a0/usr/github-watch/watch_state.json`). For recurring polling, flip on the built-in hourly scheduler (below).
 - **Create releases** (`github-create-release`) — tag a version and publish a GitHub release with real, user-facing notes (matched to the project version); refuses to overwrite an existing release.
 
 Each ability ships as a focused skill containing the exact `gh` commands for that workflow, so the agent doesn't have to guess.
@@ -99,8 +100,20 @@ Because the token is read at call time, **rotating it just means updating the Se
 | Key | Default | Meaning |
 |---|---|---|
 | `transport` | `gh` | How the agent talks to GitHub. `mcp` is planned. |
-| `secret_key` | `GITHUB_TOKEN` | Which A0 Secret holds the token. |
-| `gh_version` | `latest` | `gh` release to install, or a pinned tag like `v2.63.2`. |
+| `secret_key` | `GITHUB_TOKEN` | Advanced: which A0 Secret holds the token. Only change it if your Secret isn't named `GITHUB_TOKEN` (see Setup). Not shown in the Config panel — edit the config file. |
+| `gh_version` | `latest` | Advanced: `gh` release to install, or a pinned tag like `v2.63.2`. Not shown in the Config panel. |
+| `watch_repos` | `""` | Authoritative list of `owner/name` repos to watch, one per line. Edited in the Config panel; "watch owner/name" in chat updates it too. |
+| `watch_include_subscriptions` | `true` | Also watch repos you Watch on GitHub (`user/subscriptions`). This is GitHub's *Watch*, not *Star*. |
+| `watch_scope` | `issues,prs` | What `github-watch` reports. Medium scope = issues + PRs (comments excluded). |
+| `watch_schedule_enabled` | `false` | When true, the plugin self-registers an A0 scheduled task (`github-watch-poll`) that runs the watch on a schedule; false removes it. |
+| `watch_interval_hours` | `1` | Poll interval in hours (1 = hourly at :00). Clamped to 1–24. |
+| `watch_notify_chat` | `true` | Report scheduled-poll findings in the task's conversation. |
+| `watch_notify_telegram` | `false` | Telegram the findings (uses A0's configured Telegram). Can be combined with chat. |
+| `watch_notify_other` | `""` | Free-form delivery instruction the agent tries to fulfill with its tools (e.g. a Discord webhook, email). Best-effort. |
+
+### Recurring polling
+
+Open the plugin's **Config** panel (the gear on the plugin in the Plugins list) and turn **Recurring poll** on (or set `watch_schedule_enabled: true`). The plugin then registers a scheduled task named `github-watch-poll` that runs the `github-watch` skill every `watch_interval_hours` (default hourly). Config changes apply immediately on save — no restart needed. The plugin owns the *schedule*; **notification delivery is intentionally kept separate** — the task runs in a normal agent context and uses whatever channels A0 already has. Pick where findings go under **Notify**: report in chat, send via Telegram, both, and/or an **Other** free-form instruction (best-effort, carried out with the agent's available tools). Flip the toggle off (or uninstall) and the task is removed automatically, so nothing is left orphaned. You can also edit/disable the task directly in A0's **Scheduler** UI.
 
 ## Uninstalling
 

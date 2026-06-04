@@ -14,6 +14,35 @@ secret_key: GITHUB_TOKEN
 # otherwise pin a tag like "v2.63.2".
 gh_version: latest
 
+# --- Watch (github-watch skill) ---
+# The authoritative list of repos to poll for new/updated issues and PRs. Edit it in the plugin's
+# Config panel (one "owner/name" per line); saying "watch owner/name" in chat updates this same list.
+# Stored in the saved config (config.json), not a runtime file. One "owner/name" per line.
+watch_repos: ""
+
+# Also include repos you Watch on GitHub (notification subscriptions, gh api user/subscriptions).
+# This is GitHub's "Watch" button, NOT "Star". Set false to rely only on watch_repos.
+watch_include_subscriptions: true
+
+# What the watcher reports. Medium scope = issues + PRs (comments are intentionally excluded).
+watch_scope: issues,prs
+
+# Recurring poll. When true, the plugin self-registers an A0 scheduled task ("github-watch-poll")
+# that runs the github-watch skill on a schedule; false removes it. Default off (opt-in).
+watch_schedule_enabled: false
+
+# Poll interval in hours (1 = every hour at :00). Clamped to 1..24.
+watch_interval_hours: 1
+
+# Where the scheduled poll sends new findings. These are POINTERS only — the plugin does not send
+# anything itself; the scheduled task runs in an agent context and uses A0's own channels. You can
+# enable more than one.
+watch_notify_chat: true          # report results in the task's conversation
+watch_notify_telegram: false     # tell the agent to notify via Telegram (uses A0's configured Telegram)
+# Free-form delivery instruction the agent will try to fulfill with its available tools (e.g. a
+# Discord webhook, email). Best-effort — only works if the agent has a way to do it. Blank = none.
+watch_notify_other: ""
+
 # Reserved for the mcp transport (planned second build). Ignored while transport: gh.
 mcp:
   mode: hosted                              # hosted | self_hosted

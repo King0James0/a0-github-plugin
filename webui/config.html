@@ -1,0 +1,132 @@
+<html>
+<head><title>GitHub</title></head>
+<body>
+<div x-data>
+  <template x-if="config">
+    <div>
+      <div class="section-title">GitHub — Watch &amp; polling</div>
+      <div class="section-description">
+        Poll your watched repos for new/updated issues and pull requests. The watched set is the
+        union of the list below and the repos you Watch on GitHub. Repos can also be added in chat
+        ("watch owner/name").
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Recurring poll</div>
+          <div class="field-description">
+            When on, the plugin registers a scheduled task (<code>github-watch-poll</code>) that runs
+            the watch automatically. Off removes it.
+          </div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_schedule_enabled"
+              x-init="if (config.watch_schedule_enabled === undefined || config.watch_schedule_enabled === null) config.watch_schedule_enabled = false" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Interval (hours)</div>
+          <div class="field-description">How often the poll runs when on. 1 = every hour at :00. Range 1–24.</div>
+        </div>
+        <div class="field-control">
+          <input type="number" min="1" max="24"
+            x-init="if (config.watch_interval_hours === undefined || config.watch_interval_hours === null) config.watch_interval_hours = 1"
+            x-model.number="config.watch_interval_hours" />
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:1.2em;">Notify</div>
+      <div class="section-description">
+        Where the scheduled poll sends new findings. You can pick more than one. These are
+        <i>pointers</i> — the plugin sends nothing itself; the scheduled task runs in an agent context
+        and uses A0's own channels.
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Report in chat</div>
+          <div class="field-description">Post results into the scheduled task's conversation.</div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_notify_chat"
+              x-init="if (config.watch_notify_chat === undefined || config.watch_notify_chat === null) config.watch_notify_chat = true" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Send via Telegram</div>
+          <div class="field-description">Telegram a short summary when there is something new (uses A0's configured Telegram).</div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_notify_telegram"
+              x-init="if (config.watch_notify_telegram === undefined || config.watch_notify_telegram === null) config.watch_notify_telegram = false" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Other (custom)</div>
+          <div class="field-description">
+            A free-form delivery instruction the agent will try to carry out with the tools it has
+            (e.g. "post to my Discord webhook https://…", "email me at me@x.com"). Best-effort — it
+            works only if the agent has a way to do it. Leave blank for none.
+          </div>
+        </div>
+        <div class="field-control" style="width:100%;">
+          <input type="text" style="width:100%;"
+            placeholder="e.g. post to Discord webhook https://discord.com/api/webhooks/…"
+            x-model="config.watch_notify_other" />
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:1.2em;">Repositories</div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Include GitHub-Watched repos</div>
+          <div class="field-description">
+            Also watch the repos you Watch on GitHub (notification subscriptions). This is GitHub's
+            <b>Watch</b> button, not <b>Star</b>. Off = only the list below.
+          </div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_include_subscriptions"
+              x-init="if (config.watch_include_subscriptions === undefined || config.watch_include_subscriptions === null) config.watch_include_subscriptions = true" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Watched repositories</div>
+          <div class="field-description">
+            One <code>owner/name</code> per line — the repos to poll. This is the authoritative list;
+            populate it here right after installing. You can also add/remove in chat
+            ("watch owner/name" / "unwatch owner/name"), which updates this same list.
+          </div>
+        </div>
+        <div class="field-control" style="width:100%;">
+          <textarea rows="5" style="width:100%;font-family:monospace;font-size:0.9em;"
+            placeholder="owner/name&#10;owner/other" x-model="config.watch_repos"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </template>
+</div>
+</body>
+</html>

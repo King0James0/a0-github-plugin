@@ -6,3 +6,5 @@ config.json
 .toggle-1
 __pycache__/
 *.pyc
+
+dist/

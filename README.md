@@ -16,7 +16,7 @@ Once installed and given a token, the agent can:
 - **Triage issues** (`github-triage-issue`) — list, read, label, assign, comment on, create, and close issues.
 - **Review pull requests** (`github-review-pr`) — read a PR, inspect its diff, check CI status, and approve / comment / request changes.
 - **Search GitHub** (`github-search`) — find code, issues, PRs, or repositories, and call the GitHub REST/GraphQL API directly.
-- **Watch repos** (`github-watch`) — poll a set of repos for new/updated issues and PRs since the last check, and add/remove/show watched repos. The watched set is the union of the repo list you keep in the plugin's **Config** panel (`watch_repos`) and the repos you Watch on GitHub. Saying "watch owner/name" in chat updates that same config list. Scope is issues + PRs; only the per-repo last-checked timestamps live in a runtime file (`/a0/usr/github-watch/watch_state.json`). For recurring polling, flip on the built-in hourly scheduler (below).
+- **Watch repos** (`github-watch`) — poll a set of repos for new/updated issues and PRs (and optionally new commits) since the last check, and add/remove/show watched repos. The watched set is the union of the repo list you keep in the plugin's **Config** panel (`watch_repos`) and the repos you Watch on GitHub. Saying "watch owner/name" in chat updates that same config list. Issues + PRs are always checked; enable **Watch commits** to also catch pushes to each repo's default branch. Only the per-repo last-checked timestamps live in a runtime file (`/a0/usr/github-watch/watch_state.json`). For recurring polling, flip on the built-in hourly scheduler (below).
 - **Create releases** (`github-create-release`) — tag a version and publish a GitHub release with real, user-facing notes (matched to the project version); refuses to overwrite an existing release.
 
 Each ability ships as a focused skill containing the exact `gh` commands for that workflow, so the agent doesn't have to guess.
@@ -104,7 +104,8 @@ Because the token is read at call time, **rotating it just means updating the Se
 | `gh_version` | `latest` | Advanced: `gh` release to install, or a pinned tag like `v2.63.2`. Not shown in the Config panel. |
 | `watch_repos` | `""` | Authoritative list of `owner/name` repos to watch, one per line. Edited in the Config panel; "watch owner/name" in chat updates it too. |
 | `watch_include_subscriptions` | `true` | Also watch repos you Watch on GitHub (`user/subscriptions`). This is GitHub's *Watch*, not *Star*. |
-| `watch_scope` | `issues,prs` | What `github-watch` reports. Medium scope = issues + PRs (comments excluded). |
+| `watch_scope` | `issues,prs` | What `github-watch` always reports: issues + PRs (comments excluded). |
+| `watch_commits` | `false` | Also report new commits on each repo's default branch since the last check. Off by default (commits can be high-volume). |
 | `watch_schedule_enabled` | `false` | When true, the plugin self-registers an A0 scheduled task (`github-watch-poll`) that runs the watch on a schedule; false removes it. |
 | `watch_interval_hours` | `1` | Poll interval in hours (1 = hourly at :00). Clamped to 1–24. |
 | `watch_notify_chat` | `true` | Report scheduled-poll findings in the task's conversation. |

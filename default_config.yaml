@@ -24,8 +24,12 @@ watch_repos: ""
 # This is GitHub's "Watch" button, NOT "Star". Set false to rely only on watch_repos.
 watch_include_subscriptions: true
 
-# What the watcher reports. Medium scope = issues + PRs (comments are intentionally excluded).
+# What the watcher reports. Issues + PRs are always checked. Comments are intentionally excluded.
 watch_scope: issues,prs
+
+# Also report new commits on each repo's default branch since the last check
+# (gh api repos/<repo>/commits?since=<ts>). Off by default — commits can be high-volume.
+watch_commits: false
 
 # Recurring poll. When true, the plugin self-registers an A0 scheduled task ("github-watch-poll")
 # that runs the github-watch skill on a schedule; false removes it. Default off (opt-in).

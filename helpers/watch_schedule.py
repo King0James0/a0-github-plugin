@@ -81,9 +81,9 @@ def _cron(cfg: dict):
 
 def _prompt(cfg: dict) -> str:
     base = (
-        "Run the github-watch skill: check every watched repo for issues and pull "
-        "requests that are new or updated since the last check, then update the "
-        "last-checked timestamps. "
+        "Run the github-watch skill: check every watched repo for new activity since "
+        "the last check (issues and PRs always; commits too if watch_commits is on), "
+        "then update the last-checked timestamps. "
     )
     parts = []
     if bool(cfg.get("watch_notify_chat", True)):

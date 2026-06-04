@@ -6,7 +6,9 @@ description: Poll watched GitHub repos for new or updated issues and pull reques
 # Watch GitHub repos for new issues and PRs
 
 Reports issues and pull requests that are **new or updated since the last check** across a combined
-set of repositories. Scope is medium: **issues + PRs** (not individual comments).
+set of repositories — and, when `watch_commits` is enabled, new **commits** on each repo's default
+branch too. Individual comments are not a separate scope (but a comment bumps its issue/PR's
+`updatedAt`, so it surfaces under that item).
 
 ## The watched set
 
@@ -62,6 +64,8 @@ if cfg.get("watch_include_subscriptions", True):
         repos.update(r.strip() for r in out.splitlines() if r.strip())
     except subprocess.CalledProcessError:
         pass
+# scope flags the agent should honor for this run:
+print("FLAGS", json.dumps({"commits": bool(cfg.get("watch_commits", False))}))
 print("\n".join(sorted(repos)))
 PY
 ```
@@ -74,6 +78,15 @@ gh issue list --repo <REPO> --state all --search "updated:>=<TS>" \
 gh pr list    --repo <REPO> --state all --search "updated:>=<TS>" \
   --json number,title,url,updatedAt,state --limit 50
 ```
+
+If the FLAGS line reported `"commits": true`, also list new commits on each repo's **default branch**
+since `<TS>` (skip on first sight, same as above). A plain `git push` shows up here, not under issues/PRs.
+```bash
+gh api "repos/<REPO>/commits?since=<TS>" \
+  -q '.[] | "  \(.sha[0:7]) \(.commit.message | split("\n")[0]) — \(.html_url)"'
+```
+Note: the GitHub commits API only covers the default branch (it takes `sha=<branch>` for others) and
+`since` filters by commit date — a force-push or a merge of older commits may not surface.
 
 After reporting, save the new timestamps to the runtime state file. First time a repo is seen (no
 `last_checked` entry), record "now" and report nothing for it — this avoids dumping the whole backlog
@@ -157,8 +170,9 @@ owns cadence + delivery via A0's own channels — this skill does not send anyth
 
 ## Rules
 
-- Medium scope is issues + PRs only. If the user asks about comments too, say that's a wider scope not
-  covered here, and offer `gh api "repos/<REPO>/issues/comments?since=<TS>"` as the manual extension.
+- Scope is issues + PRs always, plus commits when `watch_commits` is on. If the user asks about
+  individual comments, note they surface via the parent issue/PR's `updatedAt`; the raw feed is
+  `gh api "repos/<REPO>/issues/comments?since=<TS>"`.
 - Always update `last_checked` after a successful check, or the next run repeats the same items.
 - On the very first run for a repo, stamp it and report nothing for it (no backlog flood).
 - Keep timestamps in UTC ISO-8601 (`...Z`); GitHub's `updated:>=` search qualifier expects that.

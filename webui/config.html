@@ -112,6 +112,24 @@
 
       <div class="field">
         <div class="field-label">
+          <div class="field-title">Watch commits</div>
+          <div class="field-description">
+            Also report new commits on each repo's <b>default branch</b> since the last check (a plain
+            <code>git push</code> shows up here, not under issues/PRs). Off by default — commits can be
+            high-volume.
+          </div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_commits"
+              x-init="if (config.watch_commits === undefined || config.watch_commits === null) config.watch_commits = false" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
           <div class="field-title">Watched repositories</div>
           <div class="field-description">
             One <code>owner/name</code> per line — the repos to poll. This is the authoritative list;

@@ -27,14 +27,18 @@ falling back to `/a0/usr/plugins/github/default_config.yaml` before the first sa
 
 ## Check for new activity (the main job)
 
-Resolve the watched set, then for each repo list issues and PRs updated since that repo's
-`last_checked`, then record the new timestamp. Use UTC ISO-8601 timestamps.
+Run the **single script below, verbatim**. It does the whole job deterministically — resolves the
+watched set, checks issues + PRs + (when enabled) commits for every repo since its own
+`last_checked`, prints a grouped report, and advances the timestamps. Do NOT hand-run per-repo `gh`
+commands instead; the point of one script is that no step (especially commits) gets skipped. Then
+deliver the printed report per the user's notify settings.
 
 ```bash
-# Resolve combined repo list (config list ∪ subscriptions), one owner/name per line, deduped:
 python3 - <<'PY'
-import json, os, subprocess
+import json, os, subprocess, datetime
+
 PLUGIN_DIR = "/a0/usr/plugins/github"
+STATE = "/a0/usr/github-watch/watch_state.json"
 
 def load_cfg():
     cj = os.path.join(PLUGIN_DIR, "config.json")
@@ -55,7 +59,14 @@ def norm_repos(cfg):
         raw = [p for line in raw.splitlines() for p in line.split(",")]
     return [r.strip() for r in raw if isinstance(r, str) and r.strip()]
 
+def gh_json(args):
+    r = subprocess.run(["gh"] + args, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or "gh error").strip())
+    return json.loads(r.stdout or "[]")
+
 cfg = load_cfg()
+want_commits = bool(cfg.get("watch_commits", False))
 repos = set(norm_repos(cfg))
 if cfg.get("watch_include_subscriptions", True):
     try:
@@ -64,53 +75,54 @@ if cfg.get("watch_include_subscriptions", True):
         repos.update(r.strip() for r in out.splitlines() if r.strip())
     except subprocess.CalledProcessError:
         pass
-# scope flags the agent should honor for this run:
-print("FLAGS", json.dumps({"commits": bool(cfg.get("watch_commits", False))}))
-print("\n".join(sorted(repos)))
-PY
-```
+repos = sorted(repos)
 
-Then per repo (substitute `<REPO>` and `<TS>` = that repo's last_checked from the state file, or skip
-the `--search` filter on first sight):
-```bash
-gh issue list --repo <REPO> --state all --search "updated:>=<TS>" \
-  --json number,title,url,updatedAt,state --limit 50
-gh pr list    --repo <REPO> --state all --search "updated:>=<TS>" \
-  --json number,title,url,updatedAt,state --limit 50
-```
-
-If the FLAGS line reported `"commits": true`, also list new commits on each repo's **default branch**
-since `<TS>` (skip on first sight, same as above). A plain `git push` shows up here, not under issues/PRs.
-```bash
-gh api "repos/<REPO>/commits?since=<TS>" \
-  -q '.[] | "  \(.sha[0:7]) \(.commit.message | split("\n")[0]) — \(.html_url)"'
-```
-Note: the GitHub commits API only covers the default branch (it takes `sha=<branch>` for others) and
-`since` filters by commit date — a force-push or a merge of older commits may not surface.
-
-After reporting, save the new timestamps to the runtime state file. First time a repo is seen (no
-`last_checked` entry), record "now" and report nothing for it — this avoids dumping the whole backlog
-on the first run.
-
-```bash
-# Stamp the given repos with the current UTC time in the state file:
-python3 - "$@" <<'PY'
-import json, os, datetime, sys
-p = "/a0/usr/github-watch/watch_state.json"
-os.makedirs(os.path.dirname(p), exist_ok=True)
-state = json.load(open(p)) if os.path.exists(p) else {"last_checked": {}}
+os.makedirs(os.path.dirname(STATE), exist_ok=True)
+state = json.load(open(STATE)) if os.path.exists(STATE) else {"last_checked": {}}
 state.setdefault("last_checked", {})
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-for repo in sys.argv[1:]:
-    state["last_checked"][repo] = now
-json.dump(state, open(p, "w"), indent=2)
-print("stamped", len(sys.argv[1:]), "repos @", now)
+
+report, new_count = [], 0
+for repo in repos:
+    ts = state["last_checked"].get(repo)
+    if not ts:                                  # first sight: baseline only, no backlog dump
+        state["last_checked"][repo] = now
+        report.append(f"{repo}: first check — baseline recorded, nothing reported")
+        continue
+    try:
+        issues = gh_json(["issue","list","--repo",repo,"--state","all","--search",
+                          f"updated:>={ts}","--json","number,title,url,state","--limit","50"])
+        prs = gh_json(["pr","list","--repo",repo,"--state","all","--search",
+                       f"updated:>={ts}","--json","number,title,url,state","--limit","50"])
+        commits = gh_json(["api", f"repos/{repo}/commits?since={ts}"]) if want_commits else []
+    except Exception as e:                       # leave ts unchanged so nothing is missed
+        report.append(f"{repo}: ERROR ({e}) — timestamp left unchanged")
+        continue
+    lines = [f"  issue #{i['number']} {i['title']} ({i['state']}) — {i['url']}" for i in issues]
+    lines += [f"  PR #{p['number']} {p['title']} ({p['state']}) — {p['url']}" for p in prs]
+    for c in commits:
+        sha = (c.get("sha") or "")[:7]
+        msg = ((c.get("commit") or {}).get("message") or "").split("\n")[0]
+        lines.append(f"  commit {sha} {msg} — {c.get('html_url','')}")
+    if lines:
+        new_count += len(lines)
+        report.append(f"{repo}:\n" + "\n".join(lines))
+    else:
+        report.append(f"{repo}: nothing new")
+    state["last_checked"][repo] = now           # advance only after a successful check
+
+json.dump(state, open(STATE, "w"), indent=2)
+print(f"Checked {len(repos)} repo(s) since last check (commits={'on' if want_commits else 'off'}). New items: {new_count}\n")
+print("\n".join(report))
 PY
-# pass the checked repos as args, e.g.:  ... owner/name owner/other
 ```
 
-Report format: group by repo, list `#<number> <title> (<state>) — <url>`. Say "nothing new" per repo
-that had no updates. Do not dump raw JSON.
+Then relay the report to the user per their notify settings (chat / Telegram / Other). Say "nothing
+new" plainly when `New items: 0`. Do not re-run per-repo `gh` commands by hand.
+
+Notes: the commits leg covers each repo's **default branch** only (the API takes `sha=<branch>` for
+others) and `since` filters by commit date, so a force-push or a merge of older commits may not
+surface. A repo's first appearance records a baseline and reports nothing (no backlog flood).
 
 ## Manage the watch list (writes the plugin config so it shows in the Config panel)
 

@@ -30,13 +30,54 @@
 
       <div class="field">
         <div class="field-label">
-          <div class="field-title">Interval (hours)</div>
-          <div class="field-description">How often the poll runs when on. 1 = every hour at :00. Range 1–24.</div>
+          <div class="field-title">Interval</div>
+          <div class="field-description">How often the poll runs when on. For anything not listed, use a custom schedule below.</div>
         </div>
         <div class="field-control">
-          <input type="number" min="1" max="24"
-            x-init="if (config.watch_interval_hours === undefined || config.watch_interval_hours === null) config.watch_interval_hours = 1"
-            x-model.number="config.watch_interval_hours" />
+          <select x-model="config.watch_interval"
+            x-init="if (!config.watch_interval) config.watch_interval = (config.watch_interval_hours ? config.watch_interval_hours + 'h' : '1h')">
+            <option value="5m">Every 5 minutes</option>
+            <option value="10m">Every 10 minutes</option>
+            <option value="15m">Every 15 minutes</option>
+            <option value="30m">Every 30 minutes</option>
+            <option value="1h">Every hour</option>
+            <option value="2h">Every 2 hours</option>
+            <option value="6h">Every 6 hours</option>
+            <option value="12h">Every 12 hours</option>
+            <option value="24h">Once a day</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Custom schedule (cron)</div>
+          <div class="field-description">
+            Advanced — a 5-field cron expression (<code>minute hour day month weekday</code>) for schedules
+            the presets can't express. <b>Overrides the interval above when set.</b> Example:
+            <code>*/15 9-17 * * 1-5</code> = every 15 min, 9am–5pm, weekdays. Leave blank to use the interval.
+          </div>
+        </div>
+        <div class="field-control">
+          <input type="text" placeholder="(none — use the interval above)" x-model="config.watch_cron" />
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Reset context each run</div>
+          <div class="field-description">
+            Clear the scheduled task's conversation after every run so its context doesn't grow
+            unbounded over time (each run starts fresh). The report still goes to your notifications and
+            the Scheduler record. On by default.
+          </div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_reset_context"
+              x-init="if (config.watch_reset_context === undefined || config.watch_reset_context === null) config.watch_reset_context = true" />
+            <span class="toggler"></span>
+          </label>
         </div>
       </div>
 
@@ -49,8 +90,11 @@
 
       <div class="field">
         <div class="field-label">
-          <div class="field-title">Report in chat</div>
-          <div class="field-description">Post results into the scheduled task's conversation.</div>
+          <div class="field-title">Notify in app (toast + bell)</div>
+          <div class="field-description">
+            Pop a toast and add an entry to the notifications bell when there's something new, via
+            A0's built-in <code>notify_user</code> tool. No setup or token needed — recommended.
+          </div>
         </div>
         <div class="field-control">
           <label class="toggle">
@@ -64,7 +108,10 @@
       <div class="field">
         <div class="field-label">
           <div class="field-title">Send via Telegram</div>
-          <div class="field-description">Telegram a short summary when there is something new (uses A0's configured Telegram).</div>
+          <div class="field-description">
+            Also Telegram a summary when there's something new. Choose how it's sent below. Off has no
+            effect on the in-app notification above (that needs nothing).
+          </div>
         </div>
         <div class="field-control">
           <label class="toggle">
@@ -72,6 +119,66 @@
               x-init="if (config.watch_notify_telegram === undefined || config.watch_notify_telegram === null) config.watch_notify_telegram = false" />
             <span class="toggler"></span>
           </label>
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_notify_telegram">
+        <div class="field-label">
+          <div class="field-title">Telegram method</div>
+          <div class="field-description">
+            <b>Tool</b> — the scheduled task sends via a Telegram tool it already has (e.g. the YATCA
+            plugin). No token here; skipped if no such tool is installed.<br/>
+            <b>Direct</b> — this plugin sends it itself via the Telegram Bot API. No other plugin
+            needed; set the token Secret and chat ID below.
+          </div>
+        </div>
+        <div class="field-control">
+          <select x-model="config.telegram_method"
+            x-init="if (!config.telegram_method) config.telegram_method = 'tool'">
+            <option value="tool">Tool (via another plugin, e.g. YATCA)</option>
+            <option value="direct">Direct (this plugin sends it)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_notify_telegram && config.telegram_method === 'tool'">
+        <div class="field-label">
+          <div class="field-title">Telegram bot</div>
+          <div class="field-description">
+            Which bot the send tool should use, by name — only matters if it manages more than one.
+            <b>Leave blank for the default.</b>
+          </div>
+        </div>
+        <div class="field-control">
+          <input type="text" placeholder="(default)" x-model="config.telegram_bot" />
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_notify_telegram && config.telegram_method === 'direct'">
+        <div class="field-label">
+          <div class="field-title">Bot token Secret</div>
+          <div class="field-description">
+            Name of the A0 Secret (Settings &gt; External Services &gt; Secrets) holding your Telegram
+            bot token. Same store as your GitHub token. Default <code>TELEGRAM_BOT_TOKEN</code>.
+          </div>
+        </div>
+        <div class="field-control">
+          <input type="text" placeholder="TELEGRAM_BOT_TOKEN"
+            x-init="if (config.telegram_secret_key === undefined || config.telegram_secret_key === null) config.telegram_secret_key = 'TELEGRAM_BOT_TOKEN'"
+            x-model="config.telegram_secret_key" />
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_notify_telegram && config.telegram_method === 'direct'">
+        <div class="field-label">
+          <div class="field-title">Chat ID</div>
+          <div class="field-description">
+            Where to send, in direct mode. Direct mode can't auto-learn it — get yours by messaging
+            <code>@userinfobot</code> on Telegram (or your bot's <code>/id</code> if it has one).
+          </div>
+        </div>
+        <div class="field-control">
+          <input type="text" placeholder="e.g. 7942829003" x-model="config.telegram_chat_id" />
         </div>
       </div>
 
@@ -91,14 +198,73 @@
         </div>
       </div>
 
+      <div class="section-title" style="margin-top:1.2em;">Enrichment</div>
+      <div class="section-description">
+        Adds more detail per item to the report (issue/PR body snippet, labels, author) and sends a
+        short model-written <b>release-note digest</b> of what changed to the in-app toast only — chat
+        and Telegram still get the full report.
+      </div>
+
+      <div class="field">
+        <div class="field-label">
+          <div class="field-title">Enable enrichment</div>
+          <div class="field-description">Richer report detail + a digest of what changed. Off by default.</div>
+        </div>
+        <div class="field-control">
+          <label class="toggle">
+            <input type="checkbox" x-model="config.watch_enrich"
+              x-init="if (config.watch_enrich === undefined || config.watch_enrich === null) config.watch_enrich = false" />
+            <span class="toggler"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_enrich">
+        <div class="field-label">
+          <div class="field-title">Digest model</div>
+          <div class="field-description">
+            Which model tier writes the digest. <b>Utility</b> = your fast/cheap model (recommended for a
+            summary). <b>Chat</b> = your main model (higher quality, heavier).
+          </div>
+        </div>
+        <div class="field-control">
+          <select x-model="config.enrich_model"
+            x-init="if (!config.enrich_model) config.enrich_model = 'utility'">
+            <option value="utility">Utility (fast/cheap)</option>
+            <option value="chat">Chat (main model)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" x-show="config.watch_enrich">
+        <div class="field-label">
+          <div class="field-title">Digest method</div>
+          <div class="field-description">
+            <b>Extension</b> — a plugin extension calls the model and posts the digest. Deterministic, and
+            the only mode that honours the model choice above. <i>(Recommended.)</i><br/>
+            <b>Agent</b> — the scheduled-task agent writes the digest itself. Lighter, but less reliable,
+            and it reroutes the whole task onto the chosen model tier.
+          </div>
+        </div>
+        <div class="field-control">
+          <select x-model="config.enrich_method"
+            x-init="if (!config.enrich_method) config.enrich_method = 'extension'">
+            <option value="extension">Extension (deterministic)</option>
+            <option value="agent">Agent (prompt-written)</option>
+          </select>
+        </div>
+      </div>
+
       <div class="section-title" style="margin-top:1.2em;">Repositories</div>
 
       <div class="field">
         <div class="field-label">
           <div class="field-title">Include GitHub-Watched repos</div>
           <div class="field-description">
-            Also watch the repos you Watch on GitHub (notification subscriptions). This is GitHub's
-            <b>Watch</b> button, not <b>Star</b>. Off = only the list below.
+            Also include repos you watch at <b>All Activity</b> level on GitHub. <b>Custom</b> and
+            <b>Participating</b> watches are not exposed by GitHub's API and can't be auto-discovered —
+            add those to the list below. Needs the token's <b>Watching: Read</b> permission. This is
+            GitHub's <b>Watch</b>, not <b>Star</b>. Off = only the list below.
           </div>
         </div>
         <div class="field-control">

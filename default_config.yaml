@@ -35,17 +35,59 @@ watch_commits: false
 # that runs the github-watch skill on a schedule; false removes it. Default off (opt-in).
 watch_schedule_enabled: false
 
-# Poll interval in hours (1 = every hour at :00). Clamped to 1..24.
-watch_interval_hours: 1
+# How often the recurring poll runs. Preset interval token (the Config panel offers a dropdown):
+#   minutes: 5m, 10m, 15m, 30m   |   hours: 1h, 2h, 6h, 12h, 24h
+watch_interval: 1h
+# Advanced: a full 5-field cron expression "minute hour day month weekday". When set it OVERRIDES
+# watch_interval — e.g. "*/15 9-17 * * 1-5" = every 15 min, 9am–5pm, weekdays. Blank = use the preset.
+watch_cron: ""
+
+# Reset the scheduled task's conversation after each run so its context doesn't grow unbounded across
+# runs (each run starts fresh — the report still goes to your notifications and the Scheduler record).
+watch_reset_context: true
 
 # Where the scheduled poll sends new findings. These are POINTERS only — the plugin does not send
 # anything itself; the scheduled task runs in an agent context and uses A0's own channels. You can
 # enable more than one.
-watch_notify_chat: true          # report results in the task's conversation
-watch_notify_telegram: false     # tell the agent to notify via Telegram (uses A0's configured Telegram)
+watch_notify_chat: true          # in-app notification (toast + bell) via the notify_user tool — no token needed
+watch_notify_telegram: false     # also Telegram a summary when there is new activity (see telegram_method)
+
+# How the Telegram summary is sent (only when watch_notify_telegram is on):
+#   tool   - the scheduled task's agent sends it via a Telegram send tool it has (e.g. the YATCA
+#            plugin's telegram_send). No token needed here; depends on such a tool being installed.
+#            If no Telegram tool is present, Telegram is simply skipped.
+#   direct - this plugin sends the report itself via the Telegram Bot API — no other plugin required.
+#            Reads the bot token from A0 Secrets (telegram_secret_key) and sends to telegram_chat_id.
+telegram_method: tool
+
+# --- telegram_method: tool ---
+# Which Telegram bot to send via, by name (when the send tool manages more than one). Blank = default.
+telegram_bot: ""
+
+# --- telegram_method: direct ---
+# Name of the A0 Secret (Settings > External Services > Secrets) holding the Telegram bot token.
+# Same store as the GitHub token; the token is read at send time and never written elsewhere.
+telegram_secret_key: TELEGRAM_BOT_TOKEN
+# Destination chat id for direct mode (direct mode cannot auto-learn it). Get it by messaging
+# @userinfobot on Telegram, or from your bot's /id command if it has one.
+telegram_chat_id: ""
 # Free-form delivery instruction the agent will try to fulfill with its available tools (e.g. a
 # Discord webhook, email). Best-effort — only works if the agent has a way to do it. Blank = none.
 watch_notify_other: ""
+
+# --- Enrichment (release-note digest + richer report) ---
+# When on: (1) the report gains more per-item detail (issue/PR body snippet, labels, author);
+# (2) a short model-written "release-note" digest of what changed is sent to the in-app toast
+# (notify_user) only — chat + Telegram still get the full report. Off by default.
+watch_enrich: false
+# Which model tier writes the digest: "utility" (fast/cheap) or "chat" (your main model).
+enrich_model: utility
+# How the digest is generated:
+#   extension - a plugin extension calls the chosen model and posts the toast. Deterministic and the
+#               only path that cleanly honours enrich_model. (Recommended.)
+#   agent     - the scheduled-task agent writes the digest itself. Lighter, but LLM-reliability-
+#               dependent; enrich_model is honoured by rerouting the WHOLE task onto that tier.
+enrich_method: extension
 
 # Reserved for the mcp transport (planned second build). Ignored while transport: gh.
 mcp:

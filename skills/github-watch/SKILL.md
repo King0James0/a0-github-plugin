@@ -27,98 +27,30 @@ falling back to `/a0/usr/plugins/github/default_config.yaml` before the first sa
 
 ## Check for new activity (the main job)
 
-Run the **single script below, verbatim**. It does the whole job deterministically — resolves the
-watched set, checks issues + PRs + (when enabled) commits for every repo since its own
-`last_checked`, prints a grouped report, and advances the timestamps. Do NOT hand-run per-repo `gh`
-commands instead; the point of one script is that no step (especially commits) gets skipped. Then
-deliver the printed report per the user's notify settings.
+The plugin ships the check as a script file. Run it **verbatim, in one command** (below) — do not
+paste or reconstruct the script inline. It does the whole job deterministically — resolves the watched
+set, checks issues + PRs + (when enabled) commits for **every repo in parallel** (a thread pool) since
+each repo's own `last_checked`, prints a grouped report, and advances the timestamps. Do NOT hand-run
+per-repo `gh` commands instead; the point of one script is that no step (especially commits) gets
+skipped and the checks run concurrently. Then deliver the printed report per the user's notify
+settings.
 
 ```bash
-python3 - <<'PY'
-import json, os, subprocess, datetime
-
-PLUGIN_DIR = "/a0/usr/plugins/github"
-STATE = "/a0/usr/github-watch/watch_state.json"
-
-def load_cfg():
-    cj = os.path.join(PLUGIN_DIR, "config.json")
-    if os.path.exists(cj):
-        try:
-            return json.load(open(cj))
-        except Exception:
-            pass
-    try:
-        import yaml
-        return yaml.safe_load(open(os.path.join(PLUGIN_DIR, "default_config.yaml"))) or {}
-    except Exception:
-        return {}
-
-def norm_repos(cfg):
-    raw = cfg.get("watch_repos") or []
-    if isinstance(raw, str):
-        raw = [p for line in raw.splitlines() for p in line.split(",")]
-    return [r.strip() for r in raw if isinstance(r, str) and r.strip()]
-
-def gh_json(args):
-    r = subprocess.run(["gh"] + args, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or "gh error").strip())
-    return json.loads(r.stdout or "[]")
-
-cfg = load_cfg()
-want_commits = bool(cfg.get("watch_commits", False))
-repos = set(norm_repos(cfg))
-if cfg.get("watch_include_subscriptions", True):
-    try:
-        out = subprocess.run(["gh","api","user/subscriptions","--paginate","-q",".[].full_name"],
-                             capture_output=True, text=True, check=True).stdout
-        repos.update(r.strip() for r in out.splitlines() if r.strip())
-    except subprocess.CalledProcessError:
-        pass
-repos = sorted(repos)
-
-os.makedirs(os.path.dirname(STATE), exist_ok=True)
-state = json.load(open(STATE)) if os.path.exists(STATE) else {"last_checked": {}}
-state.setdefault("last_checked", {})
-now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-report, new_count = [], 0
-for repo in repos:
-    ts = state["last_checked"].get(repo)
-    if not ts:                                  # first sight: baseline only, no backlog dump
-        state["last_checked"][repo] = now
-        report.append(f"{repo}: first check — baseline recorded, nothing reported")
-        continue
-    try:
-        issues = gh_json(["issue","list","--repo",repo,"--state","all","--search",
-                          f"updated:>={ts}","--json","number,title,url,state","--limit","50"])
-        prs = gh_json(["pr","list","--repo",repo,"--state","all","--search",
-                       f"updated:>={ts}","--json","number,title,url,state","--limit","50"])
-        commits = gh_json(["api", f"repos/{repo}/commits?since={ts}"]) if want_commits else []
-    except Exception as e:                       # leave ts unchanged so nothing is missed
-        report.append(f"{repo}: ERROR ({e}) — timestamp left unchanged")
-        continue
-    lines = [f"  issue #{i['number']} {i['title']} ({i['state']}) — {i['url']}" for i in issues]
-    lines += [f"  PR #{p['number']} {p['title']} ({p['state']}) — {p['url']}" for p in prs]
-    for c in commits:
-        sha = (c.get("sha") or "")[:7]
-        msg = ((c.get("commit") or {}).get("message") or "").split("\n")[0]
-        lines.append(f"  commit {sha} {msg} — {c.get('html_url','')}")
-    if lines:
-        new_count += len(lines)
-        report.append(f"{repo}:\n" + "\n".join(lines))
-    else:
-        report.append(f"{repo}: nothing new")
-    state["last_checked"][repo] = now           # advance only after a successful check
-
-json.dump(state, open(STATE, "w"), indent=2)
-print(f"Checked {len(repos)} repo(s) since last check (commits={'on' if want_commits else 'off'}). New items: {new_count}\n")
-print("\n".join(report))
-PY
+python3 /a0/usr/plugins/github/skills/github-watch/check.py
 ```
 
-Then relay the report to the user per their notify settings (chat / Telegram / Other). Say "nothing
-new" plainly when `New items: 0`. Do not re-run per-repo `gh` commands by hand.
+The script prints a **finished markdown report**. Relay it to the user **exactly as printed** —
+character for character, **including every emoji** (🐛 🔀 📝 ✅ 🆕 ⚠️). Do not summarize, reword,
+reformat, or replace any emoji with words. When there are new items **or any repo shows a ⚠️ error**,
+call the **`notify_user`** tool **exactly once** (toast + notifications bell) with that **exact** report
+text — no token needed; do not call it more than once. (Transient errors already auto-retried; a ⚠️ row
+means it persisted and is worth a heads-up.)
+
+Telegram: the script handles it **itself** when `telegram_method` is `direct` (it already sent the
+report via the Bot API by the time you see it — do not send it again). When `telegram_method` is
+`tool`, send the same report yourself **if you have a Telegram send tool** (e.g. the YATCA
+`telegram_send` tool) whenever there are new items **or a ⚠️ error**; if you have no such tool, skip
+Telegram. Never hand-run per-repo `gh` commands.
 
 Notes: the commits leg covers each repo's **default branch** only (the API takes `sha=<branch>` for
 others) and `since` filters by commit date, so a force-push or a merge of older commits may not

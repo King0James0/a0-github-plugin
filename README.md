@@ -103,18 +103,72 @@ Because the token is read at call time, **rotating it just means updating the Se
 | `secret_key` | `GITHUB_TOKEN` | Advanced: which A0 Secret holds the token. Only change it if your Secret isn't named `GITHUB_TOKEN` (see Setup). Not shown in the Config panel — edit the config file. |
 | `gh_version` | `latest` | Advanced: `gh` release to install, or a pinned tag like `v2.63.2`. Not shown in the Config panel. |
 | `watch_repos` | `""` | Authoritative list of `owner/name` repos to watch, one per line. Edited in the Config panel; "watch owner/name" in chat updates it too. |
-| `watch_include_subscriptions` | `true` | Also watch repos you Watch on GitHub (`user/subscriptions`). This is GitHub's *Watch*, not *Star*. |
+| `watch_include_subscriptions` | `true` | Also include repos you watch at **All Activity** level on GitHub (`user/subscriptions`). Needs the token's **Watching: Read** permission. **Custom** / **Participating** watches are *not* exposed by GitHub's API — see the note below. This is *Watch*, not *Star*. |
 | `watch_scope` | `issues,prs` | What `github-watch` always reports: issues + PRs (comments excluded). |
 | `watch_commits` | `false` | Also report new commits on each repo's default branch since the last check. Off by default (commits can be high-volume). |
 | `watch_schedule_enabled` | `false` | When true, the plugin self-registers an A0 scheduled task (`github-watch-poll`) that runs the watch on a schedule; false removes it. |
-| `watch_interval_hours` | `1` | Poll interval in hours (1 = hourly at :00). Clamped to 1–24. |
-| `watch_notify_chat` | `true` | Report scheduled-poll findings in the task's conversation. |
-| `watch_notify_telegram` | `false` | Telegram the findings (uses A0's configured Telegram). Can be combined with chat. |
+| `watch_interval` | `1h` | How often the poll runs. Preset token: `5m`/`10m`/`15m`/`30m` or `1h`/`2h`/`6h`/`12h`/`24h` (dropdown in the panel). |
+| `watch_cron` | `""` | Advanced: a full 5-field cron expression (e.g. `*/15 9-17 * * 1-5`). When set, it overrides `watch_interval`. |
+| `watch_reset_context` | `true` | Clear the scheduled task's conversation after each run so its context doesn't grow unbounded over time (each run starts fresh). |
+| `watch_notify_chat` | `true` | In-app notification (toast + notifications bell) via A0's built-in `notify_user` tool. No token needed. |
+| `watch_notify_telegram` | `false` | Also Telegram the findings when there's new activity. How it's sent depends on `telegram_method`. |
+| `telegram_method` | `tool` | `tool` = the scheduled task sends via a Telegram tool it already has (e.g. the YATCA plugin); skipped if none is installed. `direct` = this plugin sends it itself via the Telegram Bot API (no other plugin needed). |
+| `telegram_bot` | `""` | (`tool` mode) Which bot the send tool should use, by name. Blank = the default bot. |
+| `telegram_secret_key` | `TELEGRAM_BOT_TOKEN` | (`direct` mode) Name of the A0 Secret holding the Telegram bot token. Same Secrets store as the GitHub token. |
+| `telegram_chat_id` | `""` | (`direct` mode) Destination chat id. Direct mode can't auto-learn it — get yours from `@userinfobot` on Telegram. |
 | `watch_notify_other` | `""` | Free-form delivery instruction the agent tries to fulfill with its tools (e.g. a Discord webhook, email). Best-effort. |
+| `watch_enrich` | `false` | Add per-item detail to the report (body snippet, labels, author) **and** a model-written release-note digest to the in-app toast. See *Enrichment* below. |
+| `enrich_model` | `utility` | Model tier that writes the digest: **utility** (fast/cheap) or **chat** (your main model). |
+| `enrich_method` | `extension` | How the digest is generated: **extension** (deterministic, honours `enrich_model`) or **agent** (prompt-written; reroutes the whole task onto the tier). |
+
+> **⚠️ About "Include GitHub-Watched repos" — important.** GitHub's API only exposes repos you watch at the **All Activity** level (`GET /user/subscriptions`). Repos you watch at **Custom** or **Participating and @mentions** level are **not returned by any GitHub API** and therefore *cannot* be auto-discovered — this is a GitHub limitation, not a plugin one. To have those tracked, either switch them to **All Activity** on GitHub, or (recommended) add them to `watch_repos` directly, which works at any watch level.
+>
+> Reading your watched repos also requires the token's **Watching: Read** permission. For a **fine-grained PAT**, grant it under **Account permissions → Watching → Read-only** (it's a separate section from Repository permissions). Without it, `user/subscriptions` returns empty and the watch silently uses only your `watch_repos` list. Classic tokens have this via the standard scopes.
 
 ### Recurring polling
 
-Open the plugin's **Config** panel (the gear on the plugin in the Plugins list) and turn **Recurring poll** on (or set `watch_schedule_enabled: true`). The plugin then registers a scheduled task named `github-watch-poll` that runs the `github-watch` skill every `watch_interval_hours` (default hourly). Config changes apply immediately on save — no restart needed. The plugin owns the *schedule*; **notification delivery is intentionally kept separate** — the task runs in a normal agent context and uses whatever channels A0 already has. Pick where findings go under **Notify**: report in chat, send via Telegram, both, and/or an **Other** free-form instruction (best-effort, carried out with the agent's available tools). Flip the toggle off (or uninstall) and the task is removed automatically, so nothing is left orphaned. You can also edit/disable the task directly in A0's **Scheduler** UI.
+Turn **Recurring poll** on in the plugin's **Config** panel (or set `watch_schedule_enabled: true`). The plugin registers a scheduled task, `github-watch-poll`, that runs the `github-watch` skill on the **Interval** you pick — presets from every 5 minutes to once a day, or a **custom cron** expression for anything else (default: hourly). Changes apply on save — no restart.
+
+The plugin owns the **schedule only**; delivery runs separately in a normal agent context. Toggle it off (or uninstall) and the task is removed automatically — nothing is orphaned. Every run's full result is kept in A0's **Scheduler** UI, where you can also edit or disable the task.
+
+#### Where findings go
+
+Pick one or more under **Notify** in the Config panel:
+
+| Channel | What it does | Setup |
+|---|---|---|
+| **In-app** | Toast + notifications bell, via the built-in `notify_user` tool | None — recommended default |
+| **Telegram** | Messages the report when there's new activity | See below |
+| **Other** | A free-form instruction the agent carries out with its tools (e.g. a Discord webhook, email) | Best-effort |
+
+#### Telegram: two methods
+
+Set **Telegram method** in the panel:
+
+- **Tool** — sends through a Telegram tool the agent already has, such as the [YATCA](https://github.com/mirecekd/yatca) plugin. No token configured here; skipped if no such tool is installed.
+- **Direct** — this plugin sends the report itself via the Telegram Bot API, with **no dependency on any other plugin**. Deterministic and exact (sent straight from the watch script, emoji intact).
+
+**Direct mode setup**
+
+1. Add your bot token as an A0 Secret: **Settings → External Services → Secrets**, named `TELEGRAM_BOT_TOKEN` (or whatever you set `telegram_secret_key` to).
+2. Message `@userinfobot` on Telegram to get your chat ID, and put it in **Chat ID** (`telegram_chat_id`).
+3. Set **Telegram method** to **Direct**. The next poll with new activity sends straight to Telegram.
+
+### Enrichment
+
+Turn **Enable enrichment** on (`watch_enrich`) for two things when there's new activity:
+
+- **Richer report** — each item gains a body snippet, labels, and author (commit author for commits). This goes into the full report (chat + Telegram).
+- **Release-note digest** — a short, model-written summary of what changed, posted to the **in-app toast only**. Chat and Telegram still get the full report, so the toast stays glanceable while the detail lives in the report.
+
+Two settings control the digest:
+
+- **Digest model** (`enrich_model`) — **Utility** (fast/cheap, recommended for a summary) or **Chat** (your main model).
+- **Digest method** (`enrich_method`):
+  - **Extension** *(recommended)* — a plugin extension calls the chosen model and posts the digest. Deterministic, and the only mode that honours **Digest model**.
+  - **Agent** — the scheduled-task agent writes the digest itself. Lighter, but less reliable, and it reroutes the **whole task** onto the chosen tier (so a weaker tier affects the entire run, not just the digest).
+
+It all uses A0's own model framework — no API keys or extra config, and nothing is sent off-box beyond the model you've already configured.
 
 ## Uninstalling
 

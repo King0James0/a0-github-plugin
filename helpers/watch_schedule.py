@@ -106,7 +106,10 @@ def _cron(cfg: dict):
             minute, hour = (f"*/{n}" if n > 1 else "*"), "*"
         else:
             n = max(1, min(n, 24))
-            minute, hour = "0", (f"*/{n}" if n > 1 else "*")
+            if n >= 24:
+                minute, hour = "0", "0"  # daily; */24 is invalid cron (hour step max 23)
+            else:
+                minute, hour = "0", (f"*/{n}" if n > 1 else "*")
     return TaskSchedule(minute=minute, hour=hour, day="*", month="*", weekday="*")
 
 

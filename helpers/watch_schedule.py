@@ -24,7 +24,9 @@ import re
 import threading
 
 PLUGIN_NAME = "github"
-TASK_NAME = "github-watch-poll"
+TASK_NAME = "GitHub Watch"
+# Prior name (pre-1.5.6) — renamed in place on reconcile so existing installs migrate cleanly.
+TASK_NAME_OLD = "github-watch-poll"
 
 SYSTEM_PROMPT = (
     "You are a GitHub watch agent. Use the github-watch skill to report only what "
@@ -206,16 +208,27 @@ def _reconcile_sync(cfg: dict) -> None:
 
         scheduler = TaskScheduler.get()
         await scheduler.reload()
+        # find_task_by_name is a substring match; "github watch" (space) is NOT a substring of the
+        # legacy "github-watch-poll" (hyphens), so these two probes are unambiguous.
         existing = scheduler.find_task_by_name(TASK_NAME)
+        legacy = scheduler.find_task_by_name(TASK_NAME_OLD)
 
         if not enabled:
             if existing:
                 await scheduler.remove_task_by_name(TASK_NAME)
+            if legacy:
+                await scheduler.remove_task_by_name(TASK_NAME_OLD)
+            if existing or legacy:
                 _log(f"watch schedule disabled — removed task '{TASK_NAME}'")
             return
 
         schedule = _cron(cfg)
         prompt = _prompt(cfg)
+        if not existing and legacy:
+            # migrate the pre-1.5.6 "github-watch-poll" in place (keeps its uuid/context)
+            legacy[0].update(name=TASK_NAME)
+            existing = legacy
+            _log(f"renamed watch task '{TASK_NAME_OLD}' -> '{TASK_NAME}'")
         if existing:
             existing[0].update(
                 schedule=schedule, prompt=prompt, system_prompt=SYSTEM_PROMPT
@@ -267,8 +280,12 @@ def _remove_sync() -> None:
 
         scheduler = TaskScheduler.get()
         await scheduler.reload()
-        if scheduler.find_task_by_name(TASK_NAME):
-            await scheduler.remove_task_by_name(TASK_NAME)
+        removed = False
+        for nm in (TASK_NAME, TASK_NAME_OLD):  # retire the legacy name too
+            if scheduler.find_task_by_name(nm):
+                await scheduler.remove_task_by_name(nm)
+                removed = True
+        if removed:
             _log(f"removed task '{TASK_NAME}'")
 
     asyncio.run(_go())

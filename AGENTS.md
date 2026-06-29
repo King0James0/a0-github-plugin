@@ -46,6 +46,11 @@ uninstall-clean. The surface: a `gh`/`git` auth wrapper + the skills + a few ext
    `watch_schedule._prompt` builder emits a STRICT-ORDER block ONLY when the agent owns a delivery call;
    direct-mode Telegram (sent by `check.py`) and the extension digest must instead tell the agent NOT to
    send, or it double-delivers. Keep these mutually exclusive.
+8. **The watch runs check.py exactly once per cycle.** `tool_execute_before/_30_github_watch_once`
+   blocks a weak utility model from re-running `check.py` within one scheduled run (RepairableException;
+   keyed on the run's `last_user_message.id` so it self-resets each cycle; scoped to the watch context
+   so a manual run is unaffected). `helpers/run_once.py` holds the sys-attached state. The task is named
+   "GitHub Watch" (renamed from the pre-1.5.6 "github-watch-poll", migrated in place on reconcile).
 
 ## Build discipline
 - **Stdlib-only helpers, A0 reached lazily.** `helpers/gh_setup.py` + `helpers/watch_schedule.py` import
@@ -83,6 +88,8 @@ uninstall-clean. The surface: a `gh`/`git` auth wrapper + the skills + a few ext
 - Scheduler: `scheduler.add_task()` is the public path that BOTH appends the task AND creates its
   context (required — the Tasks list classifies contexts by id via `state_snapshot`). The reused task
   context's agent grows history every run unless reset (see invariant 6). `save_plugin_config` runs
-  BEFORE the new config is written, so reconcile from the incoming `settings`.
+  BEFORE the new config is written, so reconcile from the incoming `settings`. `check_schedule()` is a
+  STATELESS ~60s cron window (no `last_run` catch-up — setting it is a no-op for cron tasks; `job_loop`
+  ticks 60s); `find_task_by_name` is a SUBSTRING match (probe full names).
 - Secrets: read at call time from `usr/secrets.env` (`KEY=value`, value may be quoted) by the wrapper,
   by `check.py` (direct Telegram), and by `gh` natively via `GH_TOKEN` — never from a stored login.

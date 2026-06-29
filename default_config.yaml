@@ -31,7 +31,7 @@ watch_scope: issues,prs
 # (gh api repos/<repo>/commits?since=<ts>). Off by default — commits can be high-volume.
 watch_commits: false
 
-# Recurring poll. When true, the plugin self-registers an A0 scheduled task ("github-watch-poll")
+# Recurring poll. When true, the plugin self-registers an A0 scheduled task ("GitHub Watch")
 # that runs the github-watch skill on a schedule; false removes it. Default off (opt-in).
 watch_schedule_enabled: false
 

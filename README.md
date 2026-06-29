@@ -106,7 +106,7 @@ Because the token is read at call time, **rotating it just means updating the Se
 | `watch_include_subscriptions` | `true` | Also include repos you watch at **All Activity** level on GitHub (`user/subscriptions`). Needs the token's **Watching: Read** permission. **Custom** / **Participating** watches are *not* exposed by GitHub's API — see the note below. This is *Watch*, not *Star*. |
 | `watch_scope` | `issues,prs` | What `github-watch` always reports: issues + PRs (comments excluded). |
 | `watch_commits` | `false` | Also report new commits on each repo's default branch since the last check. Off by default (commits can be high-volume). |
-| `watch_schedule_enabled` | `false` | When true, the plugin self-registers an A0 scheduled task (`github-watch-poll`) that runs the watch on a schedule; false removes it. |
+| `watch_schedule_enabled` | `false` | When true, the plugin self-registers an A0 scheduled task (`GitHub Watch`) that runs the watch on a schedule; false removes it. |
 | `watch_interval` | `1h` | How often the poll runs. Preset token: `5m`/`10m`/`15m`/`30m` or `1h`/`2h`/`6h`/`12h`/`24h` (dropdown in the panel). |
 | `watch_cron` | `""` | Advanced: a full 5-field cron expression (e.g. `*/15 9-17 * * 1-5`). When set, it overrides `watch_interval`. |
 | `watch_reset_context` | `true` | Clear the scheduled task's conversation after each run so its context doesn't grow unbounded over time (each run starts fresh). |
@@ -127,7 +127,7 @@ Because the token is read at call time, **rotating it just means updating the Se
 
 ### Recurring polling
 
-Turn **Recurring poll** on in the plugin's **Config** panel (or set `watch_schedule_enabled: true`). The plugin registers a scheduled task, `github-watch-poll`, that runs the `github-watch` skill on the **Interval** you pick — presets from every 5 minutes to once a day, or a **custom cron** expression for anything else (default: hourly). Changes apply on save — no restart.
+Turn **Recurring poll** on in the plugin's **Config** panel (or set `watch_schedule_enabled: true`). The plugin registers a scheduled task, `GitHub Watch`, that runs the `github-watch` skill on the **Interval** you pick — presets from every 5 minutes to once a day, or a **custom cron** expression for anything else (default: hourly). Changes apply on save — no restart.
 
 The plugin owns the **schedule only**; delivery runs separately in a normal agent context. Toggle it off (or uninstall) and the task is removed automatically — nothing is orphaned. Every run's full result is kept in A0's **Scheduler** UI, where you can also edit or disable the task.
 

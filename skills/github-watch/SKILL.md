@@ -107,7 +107,7 @@ Show the current watched set (config list ∪ subscriptions): reuse the resolve 
 
 This skill is the *what to check*. The plugin can run it for you on a schedule: in the Config panel
 turn **Recurring poll** on (`watch_schedule_enabled: true`) and it self-registers an A0 scheduled task
-(`github-watch-poll`) that runs this skill every `watch_interval_hours` (default hourly) and delivers
+(`GitHub Watch`) that runs this skill every `watch_interval_hours` (default hourly) and delivers
 new findings per the `watch_notify` pointer (`chat` / `telegram` / `seekerzero`). Turning it off or
 uninstalling removes the task. The skill itself only reports into the conversation; the scheduled task
 owns cadence + delivery via A0's own channels — this skill does not send anything.

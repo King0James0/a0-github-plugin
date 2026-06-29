@@ -9,6 +9,33 @@ import json, os, sys, time, subprocess, datetime, concurrent.futures
 PLUGIN_DIR = "/a0/usr/plugins/github"
 STATE = "/a0/usr/github-watch/watch_state.json"
 
+# clean_env: least-privilege env for the gh subprocesses (they must NOT inherit A0's runtime secrets;
+# the /usr/local/bin/gh wrapper injects the GitHub token per-call from A0 Secrets, so no token need be
+# passed through here). Multi-name shim + inline fallback (identical allowlist) so a missing import
+# can't re-leak or break.
+clean_env = None  # type: ignore[assignment]
+for _se_name in ("usr.plugins.github.helpers.secure_env",
+                 "plugins.github.helpers.secure_env",
+                 "helpers.secure_env", "secure_env"):
+    try:
+        import importlib
+        clean_env = importlib.import_module(_se_name).clean_env  # type: ignore
+        break
+    except Exception:  # pragma: no cover
+        continue
+if clean_env is None:  # pragma: no cover - import fallback; identical to secure_env.clean_env
+    def clean_env(extra=None, *, allow=(), proxy=True):  # type: ignore[misc]
+        _k = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LANGUAGE", "LC_ALL", "LC_CTYPE",
+              "TZ", "DISPLAY", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "XDG_CACHE_HOME",
+              "XDG_DATA_HOME", "TMPDIR", "TMP", "TEMP"} | set(allow)
+        if proxy:
+            _k |= {"HTTP_PROXY", "HTTPS_PROXY", "FTP_PROXY", "ALL_PROXY", "NO_PROXY",
+                   "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"}
+        _e = {k: os.environ[k] for k in _k if k in os.environ}
+        if extra:
+            _e.update({k: v for k, v in extra.items() if v is not None})
+        return _e
+
 def load_cfg():
     cj = os.path.join(PLUGIN_DIR, "config.json")
     if os.path.exists(cj):
@@ -37,7 +64,7 @@ def gh_json(args, retries=2):
     # blip doesn't surface as a per-repo error.
     last = "gh error"
     for attempt in range(retries + 1):
-        r = subprocess.run(["gh"] + args, capture_output=True, text=True)
+        r = subprocess.run(["gh"] + args, capture_output=True, text=True, env=clean_env())
         if r.returncode == 0:
             return json.loads(r.stdout or "[]")
         last = (r.stderr or "gh error").strip()
@@ -191,7 +218,7 @@ if cfg.get("watch_include_subscriptions", True):
     # Only repos watched at "All Activity" level are returned here; Custom/Participating watches
     # are not exposed by GitHub's API. Reading this needs the token's "Watching: Read" permission.
     sub = subprocess.run(["gh","api","user/subscriptions","--paginate","-q",".[].full_name"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, env=clean_env())
     if sub.returncode == 0:
         repos.update(r.strip() for r in sub.stdout.splitlines() if r.strip())
     else:
